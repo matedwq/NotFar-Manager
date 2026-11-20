@@ -12,7 +12,7 @@ on:
         required: true
         type: string
       attach_arm64:
-        description: Add only the ARM64 executable to an existing published release
+        description: Add the ARM64 executable and its source archive to an existing published release
         type: boolean
         default: false
 
@@ -49,6 +49,7 @@ jobs:
             git merge-base --is-ancestor "$build_sha" "$GITHUB_SHA"
             git diff --exit-code "$RELEASE_TAG" "$build_sha" -- src third_party \
               ':!src/notfar.manifest' ':!src/notfar.rc'
+            printf 'ARM64_SOURCE_SHA=%s\n' "$build_sha" >> "$GITHUB_ENV"
           else
             [[ "$(jq -r 'select(.isDraft) | .targetCommitish' <<<"$release")" == "$build_sha" ]]
           fi
@@ -70,7 +71,19 @@ jobs:
         run: |
           gh release upload "$RELEASE_TAG" dist/NotFar-Manager.exe dist/NotFar-Manager-ARM64.exe --repo "$GITHUB_REPOSITORY"
           gh release edit "$RELEASE_TAG" --draft=false --repo "$GITHUB_REPOSITORY"
-      - name: Attach ARM64 to the published release
+      - name: Attach ARM64 and its source to the published release
         if: inputs.attach_arm64
         run: |
-          gh release upload "$RELEASE_TAG" 'dist/NotFar-Manager-ARM64.exe#Windows ARM64' --repo "$GITHUB_REPOSITORY"
+          exe=dist/NotFar-Manager-ARM64.exe
+          published_digest="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" \
+            --jq '.assets[] | select(.name == "NotFar-Manager-ARM64.exe") | .digest')"
+          if [[ -z "$published_digest" ]]; then
+            gh release upload "$RELEASE_TAG" "$exe#Windows ARM64" --repo "$GITHUB_REPOSITORY"
+          else
+            exe_hash="$(sha256sum "$exe" | cut -d' ' -f1)"
+            [[ "$published_digest" == "sha256:$exe_hash" ]]
+          fi
+          archive_name="NotFar-Manager-${RELEASE_TAG}-ARM64-source"
+          git archive --format=zip --prefix="$archive_name/" \
+            -o "dist/$archive_name.zip" "$ARM64_SOURCE_SHA"
+          gh release upload "$RELEASE_TAG" "dist/$archive_name.zip#Windows ARM64 source" --repo "$GITHUB_REPOSITORY"
