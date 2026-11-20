@@ -4,13 +4,17 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Existing draft release tag (vX.Y.Z)
+        description: Existing release tag (vX.Y.Z)
         required: true
         type: string
       build_run:
         description: Successful Windows 64-bit workflow run ID
         required: true
         type: string
+      attach_arm64:
+        description: Add only the ARM64 executable to an existing published release
+        type: boolean
+        default: false
 
 permissions:
   actions: read
@@ -24,17 +28,32 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       RELEASE_TAG: ${{ inputs.version }}
       BUILD_RUN: ${{ inputs.build_run }}
+      ATTACH_ARM64: ${{ inputs.attach_arm64 }}
     steps:
-      - name: Verify draft and build
+      - if: inputs.attach_arm64
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify release and build
         run: |
           [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ && "$BUILD_RUN" =~ ^[0-9]+$ ]]
           build_sha="$(gh run view "$BUILD_RUN" --repo "$GITHUB_REPOSITORY" \
-            --json conclusion,headSha,workflowName \
-            --jq 'select(.conclusion == "success" and .workflowName == "Windows 64-bit") | .headSha')"
-          draft_sha="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
-            --json isDraft,targetCommitish --jq 'select(.isDraft) | .targetCommitish')"
-          [[ -n "$build_sha" && "$build_sha" == "$draft_sha" ]]
-      - uses: actions/download-artifact@v4
+            --json conclusion,headBranch,headSha,event,workflowName \
+            --jq 'select(.conclusion == "success" and .workflowName == "Windows 64-bit" and
+              .headBranch == "main" and (.event == "push" or .event == "workflow_dispatch")) | .headSha')"
+          [[ -n "$build_sha" ]]
+          release="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft,targetCommitish)"
+          if [[ "$ATTACH_ARM64" == true ]]; then
+            [[ "$(jq -r .isDraft <<<"$release")" == false ]]
+            git merge-base --is-ancestor "$build_sha" "$GITHUB_SHA"
+            git diff --exit-code "$RELEASE_TAG" "$build_sha" -- src third_party \
+              ':!src/notfar.manifest' ':!src/notfar.rc'
+          else
+            [[ "$(jq -r 'select(.isDraft) | .targetCommitish' <<<"$release")" == "$build_sha" ]]
+          fi
+      - if: ${{ !inputs.attach_arm64 }}
+        uses: actions/download-artifact@v4
         with:
           github-token: ${{ github.token }}
           run-id: ${{ inputs.build_run }}
@@ -47,6 +66,11 @@ jobs:
           name: NotFar-Manager-arm64
           path: dist
       - name: Attach and publish
+        if: ${{ !inputs.attach_arm64 }}
         run: |
           gh release upload "$RELEASE_TAG" dist/NotFar-Manager.exe dist/NotFar-Manager-ARM64.exe --repo "$GITHUB_REPOSITORY"
           gh release edit "$RELEASE_TAG" --draft=false --repo "$GITHUB_REPOSITORY"
+      - name: Attach ARM64 to the published release
+        if: inputs.attach_arm64
+        run: |
+          gh release upload "$RELEASE_TAG" 'dist/NotFar-Manager-ARM64.exe#Windows ARM64' --repo "$GITHUB_REPOSITORY"
