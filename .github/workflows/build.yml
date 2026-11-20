@@ -16,7 +16,7 @@ jobs:
         include:
           - arch: x64
             runner: windows-latest
-            exe: build/NotFar-Manager.exe
+            exe: build/NotFar-Manager-x64.exe
             machine: "0x8664"
           - arch: arm64
             runner: windows-11-arm

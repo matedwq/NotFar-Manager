@@ -20,7 +20,7 @@ if not "%~1"=="" if /i not "%~1"=="test" (
 )
 
 set "out=build"
-set "exe=NotFar-Manager.exe"
+set "exe=NotFar-Manager-x64.exe"
 set "component=Microsoft.VisualStudio.Component.VC.Tools.x86.x64"
 set "rcflags="
 if /i "%target%"=="arm64" (

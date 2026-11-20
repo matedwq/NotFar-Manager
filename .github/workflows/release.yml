@@ -9,10 +9,13 @@ on:
         type: string
       build_run:
         description: Successful Windows 64-bit workflow run ID
-        required: true
         type: string
       attach_arm64:
         description: Add the ARM64 executable and its source archive to an existing published release
+        type: boolean
+        default: false
+      attach_x64_source:
+        description: Add a named source archive from the existing x64 release tag
         type: boolean
         default: false
 
@@ -22,6 +25,7 @@ permissions:
 
 jobs:
   publish:
+    if: ${{ !inputs.attach_x64_source }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
@@ -69,7 +73,7 @@ jobs:
       - name: Attach and publish
         if: ${{ !inputs.attach_arm64 }}
         run: |
-          gh release upload "$RELEASE_TAG" dist/NotFar-Manager.exe dist/NotFar-Manager-ARM64.exe --repo "$GITHUB_REPOSITORY"
+          gh release upload "$RELEASE_TAG" dist/NotFar-Manager-x64.exe dist/NotFar-Manager-ARM64.exe --repo "$GITHUB_REPOSITORY"
           gh release edit "$RELEASE_TAG" --draft=false --repo "$GITHUB_REPOSITORY"
       - name: Attach ARM64 and its source to the published release
         if: inputs.attach_arm64
@@ -87,3 +91,28 @@ jobs:
           git archive --format=zip --prefix="$archive_name/" \
             -o "dist/$archive_name.zip" "$ARM64_SOURCE_SHA"
           gh release upload "$RELEASE_TAG" "dist/$archive_name.zip#Windows ARM64 source" --repo "$GITHUB_REPOSITORY"
+  publish_x64_source:
+    if: inputs.attach_x64_source
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Attach x64 source from the release tag
+        run: |
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          release="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft,assets)"
+          jq -e '.isDraft == false and any(.assets[]; .name == "NotFar-Manager-x64.exe")' <<<"$release"
+          tag="refs/tags/$RELEASE_TAG"
+          name="NotFar-Manager-$RELEASE_TAG-x64-source"
+          extra=()
+          if ! git cat-file -e "$tag:LICENSE" 2>/dev/null; then
+            extra+=(--add-file=LICENSE)
+          fi
+          git archive --format=zip --prefix="$name/" "${extra[@]}" -o "$name.zip" "$tag"
+          gh release upload "$RELEASE_TAG" "$name.zip" --repo "$GITHUB_REPOSITORY"

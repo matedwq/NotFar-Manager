@@ -3,7 +3,7 @@
 NotFar Manager is a portable 64-bit file manager for Windows, based on the dual-pane workflow of [Far Manager](https://github.com/FarGroup/FarManager) and built for large directories.
 
 - **[Download for Windows 11 ARM64](https://github.com/matedwq/NotFar-Manager/releases/latest/download/NotFar-Manager-ARM64.exe)** for ARM processors. This executable runs natively on ARM64.
-- [Download for Windows 10 or 11 x64](https://github.com/matedwq/NotFar-Manager/releases/latest/download/NotFar-Manager.exe) for Intel and AMD processors.
+- [Download for Windows 10 or 11 x64](https://github.com/matedwq/NotFar-Manager/releases/latest/download/NotFar-Manager-x64.exe) for Intel and AMD processors.
 
 Run the downloaded file directly. See the [latest release notes](https://github.com/matedwq/NotFar-Manager/releases/latest) for changes.
 
@@ -43,14 +43,14 @@ For **Apply command**, enter an executable and its arguments. The placeholder `{
 
 NotFar uses Win32 directly for file operations. The menu does not load Explorer handlers or depend on Explorer's elevation broker. Windows access rights still apply. ZIP support is compiled into the EXE with [miniz](https://github.com/richgel999/miniz), licensed under the included [MIT notice](third_party/miniz/LICENSE). The menu has no Far plug-in or external archiver dependencies. Encrypted ZIPs, editing existing archives and other archive formats are outside the built-in ZIP commands. The editor works with text files up to 8 MiB.
 
-You can pass one or two starting folders on the command line, for example `NotFar-Manager.exe "D:\Data" "C:\Windows"`.
+You can pass one or two starting folders on the command line, for example `NotFar-Manager-x64.exe "D:\Data" "C:\Windows"`.
 
 ## Building and testing
 
 Use Visual Studio Build Tools 2022 or later with **Desktop development with C++** and the MSVC toolset for the target architecture.
 
 - `build.cmd arm64` writes `build\arm64\NotFar-Manager-ARM64.exe`.
-- `build.cmd x64` writes `build\NotFar-Manager.exe`.
+- `build.cmd x64` writes `build\NotFar-Manager-x64.exe`.
 - Add `test` after the architecture to run the filesystem checks on a matching Windows machine.
 - `build\files-test.exe --scan "D:\Test data" 200000` measures reading and sorting an existing folder with the specified number of files.
 - `build\files-test.exe --benchmark 200000` creates a temporary dataset, runs the same measurements, and removes the test files.
