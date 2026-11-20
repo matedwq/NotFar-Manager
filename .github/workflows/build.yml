@@ -1,0 +1,30 @@
+name: Windows x64
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and test
+        shell: cmd
+        run: build.cmd test
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NotFar-Manager-x64
+          path: build/NotFar-Manager.exe
+          if-no-files-found: error
+      - name: Measure directory loading and sorting
+        if: github.event_name == 'workflow_dispatch'
+        shell: cmd
+        run: |
+          build\files-test.exe --benchmark 200000 || exit /b 1
+          build\files-test.exe --synthetic 2000000 || exit /b 1
