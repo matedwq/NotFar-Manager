@@ -1,0 +1,46 @@
+name: Publish Windows release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Existing draft release tag (vX.Y.Z)
+        required: true
+        type: string
+      build_run:
+        description: Successful Windows x64 workflow run ID
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ inputs.version }}
+      BUILD_RUN: ${{ inputs.build_run }}
+    steps:
+      - name: Verify draft and build
+        run: |
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ && "$BUILD_RUN" =~ ^[0-9]+$ ]]
+          build_sha="$(gh run view "$BUILD_RUN" --repo "$GITHUB_REPOSITORY" \
+            --json conclusion,headSha,workflowName \
+            --jq 'select(.conclusion == "success" and .workflowName == "Windows x64") | .headSha')"
+          draft_sha="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --json isDraft,targetCommitish --jq 'select(.isDraft) | .targetCommitish')"
+          [[ -n "$build_sha" && "$build_sha" == "$draft_sha" ]]
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.build_run }}
+          name: NotFar-Manager-x64
+          path: dist
+      - name: Attach and publish
+        run: |
+          gh release upload "$RELEASE_TAG" dist/NotFar-Manager.exe --repo "$GITHUB_REPOSITORY"
+          gh release edit "$RELEASE_TAG" --draft=false --repo "$GITHUB_REPOSITORY"
