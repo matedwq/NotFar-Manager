@@ -1,8 +1,11 @@
 # NotFar Manager
 
-NotFar Manager is a portable file manager for Windows 10 and 11 x64, based on the dual-pane workflow of [Far Manager](https://github.com/FarGroup/FarManager) and built for large directories.
+NotFar Manager is a portable 64-bit file manager for Windows, based on the dual-pane workflow of [Far Manager](https://github.com/FarGroup/FarManager) and built for large directories.
 
-**[Download NotFar-Manager.exe for Windows x64](https://github.com/matedwq/NotFar-Manager/releases/latest/download/NotFar-Manager.exe)**. Run the downloaded file directly. See the [latest release notes](https://github.com/matedwq/NotFar-Manager/releases/latest) for changes.
+- **[Download for Windows 11 ARM64](https://github.com/matedwq/NotFar-Manager/releases/latest/download/NotFar-Manager-ARM64.exe)** for ARM processors. This executable runs natively on ARM64.
+- [Download for Windows 10 or 11 x64](https://github.com/matedwq/NotFar-Manager/releases/latest/download/NotFar-Manager.exe) for Intel and AMD processors.
+
+Run the downloaded file directly. See the [latest release notes](https://github.com/matedwq/NotFar-Manager/releases/latest) for changes.
 
 The interface starts in English. Use the dropdown in the upper-right corner to switch between **English** and **Русский**. Changes take effect immediately, and the app remembers your choice.
 
@@ -44,9 +47,11 @@ You can pass one or two starting folders on the command line, for example `NotFa
 
 ## Building and testing
 
-Run `build.cmd` on Windows with Visual Studio Build Tools 2022 or later and the **Desktop development with C++** workload. The executable is written to `build\NotFar-Manager.exe`.
+Use Visual Studio Build Tools 2022 or later with **Desktop development with C++** and the MSVC toolset for the target architecture.
 
-- `build.cmd test` builds the app and runs filesystem checks in temporary folders.
+- `build.cmd arm64` writes `build\arm64\NotFar-Manager-ARM64.exe`.
+- `build.cmd x64` writes `build\NotFar-Manager.exe`.
+- Add `test` after the architecture to run the filesystem checks on a matching Windows machine.
 - `build\files-test.exe --scan "D:\Test data" 200000` measures reading and sorting an existing folder with the specified number of files.
 - `build\files-test.exe --benchmark 200000` creates a temporary dataset, runs the same measurements, and removes the test files.
 

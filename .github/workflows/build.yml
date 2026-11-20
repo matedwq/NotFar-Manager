@@ -1,4 +1,4 @@
-name: Windows x64
+name: Windows 64-bit
 
 on:
   push:
@@ -10,20 +10,67 @@ permissions:
 
 jobs:
   build:
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: windows-latest
+            exe: build/NotFar-Manager.exe
+            machine: "0x8664"
+          - arch: arm64
+            runner: windows-11-arm
+            exe: build/arm64/NotFar-Manager-ARM64.exe
+            machine: "0xaa64"
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
       - name: Build and test
         shell: cmd
-        run: build.cmd test
+        run: build.cmd ${{ matrix.arch }} test
+      - name: Verify native executable and start the GUI
+        shell: pwsh
+        env:
+          NOTFAR_EXE: ${{ matrix.exe }}
+          NOTFAR_ARCH: ${{ matrix.arch }}
+          NOTFAR_MACHINE: ${{ matrix.machine }}
+        run: |
+          if ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString() -ne $env:NOTFAR_ARCH) {
+            throw "The runner is not running Windows $env:NOTFAR_ARCH"
+          }
+          $exe = (Resolve-Path $env:NOTFAR_EXE).Path
+          $bytes = [IO.File]::ReadAllBytes($exe)
+          $header = [BitConverter]::ToInt32($bytes, 0x3c)
+          if ([BitConverter]::ToUInt32($bytes, $header) -ne 0x4550 -or
+              [BitConverter]::ToUInt16($bytes, $header + 4) -ne [Convert]::ToUInt16($env:NOTFAR_MACHINE, 16) -or
+              [BitConverter]::ToUInt16($bytes, $header + 24) -ne 0x20b) {
+            throw "Expected a native $env:NOTFAR_ARCH PE32+ executable"
+          }
+          if ((Get-Item $exe).VersionInfo.FileDescription -ne "NotFar Manager for Windows $env:NOTFAR_ARCH") {
+            throw "The executable description does not match its architecture"
+          }
+          $app = Start-Process $exe -PassThru
+          try {
+            $deadline = [DateTime]::UtcNow.AddSeconds(20)
+            do {
+              if ($app.HasExited) { throw "NotFar exited with code $($app.ExitCode)" }
+              $app.Refresh()
+              if ($app.MainWindowTitle -eq 'NotFar Manager') { break }
+              Start-Sleep -Milliseconds 200
+            } while ([DateTime]::UtcNow -lt $deadline)
+            if ($app.MainWindowTitle -ne 'NotFar Manager') { throw 'NotFar did not open its main window' }
+            Write-Host "Verified the native $env:NOTFAR_ARCH GUI"
+          } finally {
+            if (!$app.HasExited) { Stop-Process -Id $app.Id }
+          }
       - uses: actions/upload-artifact@v4
         with:
-          name: NotFar-Manager-x64
-          path: build/NotFar-Manager.exe
+          name: NotFar-Manager-${{ matrix.arch }}
+          path: ${{ matrix.exe }}
           if-no-files-found: error
       - name: Measure directory loading and sorting
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' && matrix.arch == 'x64'
         shell: cmd
         run: |
           build\files-test.exe --benchmark 200000 || exit /b 1
